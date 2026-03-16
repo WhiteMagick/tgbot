@@ -72,11 +72,15 @@ def main():
     app.add_handler(CommandHandler("start", start))
 
     scheduler = AsyncIOScheduler(timezone="Europe/Moscow")
-    scheduler.add_job(send_daily_verse, "cron", hour=2, minute=00, args=[app])  # каждый день в 9:00
-    scheduler.add_job(check_rutube, "interval", minutes=5, args=[app])        # проверка каждые 10 мин
-    scheduler.start()
+
+    async def on_startup(app: Application):
+        scheduler.add_job(send_daily_verse, "cron", hour=2, minute=0, args=[app])
+        scheduler.add_job(check_rutube, "interval", minutes=5, args=[app])
+        scheduler.start()
+
+    app.post_init = on_startup
 
     app.run_polling()
-
+    
 if __name__ == "__main__":
     main()
