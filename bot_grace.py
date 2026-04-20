@@ -3,7 +3,7 @@ import logging
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-
+from bs4 import BeautifulSoup
 # --- настройки ---
 TOKEN = ""
 CHAT_ID = ""
@@ -32,6 +32,17 @@ def get_random_bible_verse_ru():
 async def send_daily_verse(app: Application):
     verse = get_random_bible_verse_ru()
     await app.bot.send_message(chat_id=CHAT_ID, text=f"📖 Сегодняшний стих:\n\n{verse}")
+
+async def verse_of_the_day(app: Application):
+    url = "https://www.bible.com/ru/verse-of-the-day"
+    resp = requests.get(url, headers={"User-Agent": "Mozilla/5.0"})
+    soup = BeautifulSoup(resp.text, "html.parser")
+
+    # Ищем мета-тег og:description
+    meta_desc = soup.find("meta", property="og:image")
+    if meta_desc:
+        await app.bot.send_photo(chat_id=CHAT_ID,photo=meta_desc["content"])
+
 
 # --- проверка Rutube ---
 async def check_rutube(app: Application):
@@ -74,7 +85,8 @@ def main():
     scheduler = AsyncIOScheduler(timezone="Europe/Moscow")
 
     async def on_startup(app: Application):
-        scheduler.add_job(send_daily_verse, "cron", hour=2, minute=0, args=[app])
+        #scheduler.add_job(send_daily_verse, "cron", hour=2, minute=0, args=[app])
+        scheduler.add_job(verse_of_the_day, "cron", hour=2, minute=0, args=[app])
         scheduler.add_job(check_rutube, "interval", minutes=5, args=[app])
         scheduler.start()
 
