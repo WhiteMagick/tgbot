@@ -4,6 +4,12 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from bs4 import BeautifulSoup
+import os
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.chrome.options import Options
 # --- настройки ---
 TOKEN = ""
 CHAT_ID = ""
@@ -15,17 +21,19 @@ logger = logging.getLogger(__name__)
 
 last_video_id = None  # для Rutube
 
-# --- получаем случайный стих (русский перевод РСТ) ---
+# --- получаем случайный стих (русский перевод НРП) ---
 def get_random_bible_verse_ru():
-    try:
-        resp = requests.get("https://justbible.ru/api/random?translation=rst", timeout=10).json()
-        #book = resp.get("book")
-        #chapter = resp.get("chapter")
-        verse = resp.get("verse")
-        info = resp.get("info")
-        return f"{verse} — {info}"
-    except Exception as e:
-        logger.error(f"Ошибка при получении стиха: {e}")
+    url = "https://www.bible.com/ru/verse-of-the-day"
+    resp = requests.get(url, headers={"User-Agent": "Mozilla/5.0"})
+    soup = BeautifulSoup(resp.text, "html.parser")
+    a_tag = soup.find('div', class_='border rounded-1 border-l-large border-black mbe-3 mbs-2 plb-1 pli-1 pis-2 dark:border-white') 
+
+    if a_tag:
+        text = a_tag.get_text(strip=True)
+        print("Найденный текст:", text)
+        return f"{text}"
+    else:
+        #logger.error(f"Ошибка при получении стиха: {e}")
         return "⚠️ Не удалось получить стих."
 
 # --- отправка стиха ---
@@ -34,12 +42,26 @@ async def send_daily_verse(app: Application):
     await app.bot.send_message(chat_id=CHAT_ID, text=f"📖 Сегодняшний стих:\n\n{verse}")
 
 async def verse_of_the_day(app: Application):
-    url = "https://www.bible.com/ru/verse-of-the-day"
-    resp = requests.get(url, headers={"User-Agent": "Mozilla/5.0"})
-    soup = BeautifulSoup(resp.text, "html.parser")
+    chrome_options = Options()
+    chrome_options.add_argument("--headless")  # Без окна
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    driver = webdriver.Chrome(options=chrome_options)
 
-    # Ищем мета-тег og:description
-    meta_desc = soup.find("meta", property="og:image")
+    url = "https://www.bible.com/ru/verse-of-the-day"
+    driver.get(url)
+    # --- 2. Ждём появления контента ---
+    wait = WebDriverWait(driver, 15)
+    # --- 3. Извлекаем HTML и парсим ---
+    html = driver.page_source
+    driver.quit()
+    soup = BeautifulSoup(html, "html.parser")
+    eta_desc = soup.find("meta", property="og:image")
+    print(eta_desc["content"])
+    if eta_desc:
+        await app.bot.send_photo(chat_id=CHAT_ID,photo=eta_desc["content"])
+    meta_desc = soup.find("meta", property="og:description")
+    print(meta_desc["content"])
     if meta_desc:
         await app.bot.send_photo(chat_id=CHAT_ID,photo=meta_desc["content"])
 
@@ -48,7 +70,7 @@ async def verse_of_the_day(app: Application):
 async def check_rutube(app: Application):
     global last_video_id
     try:
-        resp = requests.get(RUTUBE_PLAYLIST_URL, timeout=10).json()
+        resp = requests.get(RUTUBE_PLAYLIST_URL, headers={"User-Agent": "Mozilla/5.0"}, timeout=10).json()
         results = resp.get("results", [])
         if not results:
             return
