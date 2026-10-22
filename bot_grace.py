@@ -62,8 +62,9 @@ async def verse_of_the_day(app: Application):
         await app.bot.send_photo(chat_id=CHAT_ID,photo=eta_desc["content"])
     meta_desc = soup.find("meta", property="og:description")
     print(meta_desc["content"])
+    verse = meta_desc["content"]
     if meta_desc:
-        await app.bot.send_photo(chat_id=CHAT_ID,photo=meta_desc["content"])
+        await app.bot.send_message(chat_id=CHAT_ID, text=f"📖 Сегодняшний стих:\n\n{verse}")
 
 
 # --- проверка Rutube ---

@@ -1,0 +1,14 @@
+[Unit]
+Description=Telegram bot graceofgod service
+After=network.target
+[Service]
+User=root
+Group=root
+WorkingDirectory=/opt/bot/
+ExecStart=/opt/bot/venv/bin/python3 main.py
+Restart=always
+RestartSec=10
+StandardOutput=append:/var/log/bot.log
+StandardError=append:/var/log/bot.log
+[Install]
+WantedBy=multi-user.target
